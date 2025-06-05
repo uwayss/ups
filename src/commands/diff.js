@@ -17,25 +17,18 @@ function getGeminiKey() {
   return apiKey;
 }
 
-async function callGemini(message, model = "gemini-pro") {
+async function callGemini(message, model = "gemini-2.0-flash") {
   console.log(`🤖 Calling Gemini API with model: ${model}...`);
   try {
-    const genAI = new GoogleGenAI(getGeminiKey());
-    const generationConfig = {
-      temperature: 0.3,
-    };
-    const geminiModel = genAI.getGenerativeModel({ model, generationConfig });
-    const result = await geminiModel.generateContent(message);
-    const response = result.response;
+    const ai = new GoogleGenAI({ apiKey: getGeminiKey() });
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: message,
+    });
     console.log("✅ Successfully received response from Gemini");
-    return response.text();
+    return response.text;
   } catch (error) {
     console.error("❌ Error calling Gemini API:", error.message);
-    if (error.message.includes("API key not valid")) {
-      console.error(
-        "Ensure your GEMINI_API_KEY is correct and has permissions for the model."
-      );
-    }
     throw error;
   }
 }
