@@ -33,6 +33,8 @@ async function generateFileDump(
     ".github",
     "dist",
     "bin",
+    "updates",
+    ".next",
   ]);
 
   const defaultExcludeFiles = new Set([
@@ -127,6 +129,7 @@ async function generateFileDump(
     ".exe",
     ".dmg",
     ".app",
+    ".tsbuildinfo",
   ]);
 
   const excludeDirs = new Set(defaultExcludeDirs);
@@ -283,7 +286,7 @@ async function generateFileDump(
 }
 
 async function main() {
-  console.log("🚀 Starting codebaseDump.js script...");
+  console.log("🚀 Starting dump.js script...");
   program
     .argument(
       "[targetPath]",

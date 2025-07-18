@@ -29,8 +29,8 @@ For example:
 
 ```bash
 npx ups diff --msg
-npx ups codebaseDump
-npx ups codebaseDump src/components --natives
+npx ups dump
+npx ups dump src/components --natives
 ```
 
 To see available commands:
@@ -52,7 +52,7 @@ npx ups <script_name> --help
 Currently included scripts:
 
 - `diff`: Generates commit messages from git diffs and optionally saves diffs/messages.
-- `codebaseDump`: Dumps the codebase of a project into a single text file.
+- `dump`: Dumps the codebase of a project into a single text file.
 
 ## Adding New Scripts
 
