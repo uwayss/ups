@@ -1,6 +1,6 @@
 {
   "name": "@uwayss/ups",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Uwayss's Project Utilities - A CLI tool for common development tasks.",
   "main": "bin/ups.js",
   "bin": {
