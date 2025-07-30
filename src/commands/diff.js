@@ -4,6 +4,7 @@ import { program } from "commander";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import readline from "readline";
 
 function getGeminiKey() {
   console.log("🔑 Checking for Gemini API key...");
@@ -137,10 +138,63 @@ ${diffContent}`;
 function saveCommitMessage(commitMessage, filepath) {
   console.log("💾 Saving commit message...");
   try {
-    fs.writeFileSync(filepath, commitMessage);
+    fs.writeFileSync(filepath, filepath);
     console.log(`✅ Commit message saved to: ${filepath}`);
   } catch (error) {
     console.error(`❌ Error saving commit message: ${error.message}`);
+    throw error;
+  }
+}
+
+function askConfirmation(query) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) =>
+    rl.question(query, (ans) => {
+      rl.close();
+      const cleanAns = ans.toLowerCase().trim();
+      resolve(cleanAns === "y" || cleanAns === "");
+    })
+  );
+}
+
+function commitAndSync(commitMessage) {
+  const tempDir = os.tmpdir();
+  const tempFilePath = path.join(tempDir, `ups_commit_${Date.now()}.txt`);
+
+  try {
+    console.log("➕ Staging all changes...");
+    execSync("git add -A");
+    console.log("✅ Changes staged.");
+
+    console.log("✍️ Committing...");
+    fs.writeFileSync(tempFilePath, commitMessage);
+    execSync(`git commit -F "${tempFilePath}"`);
+    console.log("✅ Commit successful.");
+  } catch (error) {
+    console.error("❌ Git commit failed:", error.message);
+    throw error;
+  } finally {
+    if (fs.existsSync(tempFilePath)) {
+      fs.unlinkSync(tempFilePath);
+    }
+  }
+
+  try {
+    console.log("🔄 Syncing with remote...");
+    const branchName = execSync("git branch --show-current", {
+      encoding: "utf-8",
+    }).trim();
+    if (!branchName) {
+      throw new Error("Could not determine current branch name.");
+    }
+    execSync(`git push origin ${branchName}`);
+    console.log(`✅ Pushed to origin/${branchName}.`);
+  } catch (error) {
+    console.error("❌ Git push failed:", error.message);
     throw error;
   }
 }
@@ -171,8 +225,10 @@ async function main() {
 
     const commitMessage = await generateCommitMessage(diffContent);
 
-    if (commitMessage) {
-      console.log("\n📋 Generated Commit Message:\n", commitMessage);
+    if (commitMessage && commitMessage.trim() !== "No changes to commit.") {
+      console.log("\n📋 Generated Commit Message:\n---");
+      console.log(commitMessage);
+      console.log("---\n");
 
       if (options.diff) {
         const diffFilename = generateFilename("diff");
@@ -188,9 +244,18 @@ async function main() {
         );
         saveCommitMessage(commitMessage, commitMessageFilePath);
       }
+
+      const proceed = await askConfirmation(
+        "❔ Commit and push with this message? (y/n) [Y]: "
+      );
+      if (proceed) {
+        commitAndSync(commitMessage);
+      } else {
+        console.log("👍 Commit aborted by user.");
+      }
     } else if (diffContent.trim() === "" && options.msg) {
       console.log(
-        "ℹ️ No changes detected, so no commit message to save, but --msg specified. An empty commit message file will be created if you choose to save."
+        "ℹ️ No changes detected, so no commit message to save, but --msg specified. An empty commit message file will be created."
       );
       const commitMessageFilename = generateFilename("commit_message_empty");
       const commitMessageFilePath = path.join(
@@ -198,6 +263,8 @@ async function main() {
         commitMessageFilename
       );
       saveCommitMessage("No changes detected.", commitMessageFilePath);
+    } else {
+      console.log("✅ No changes to commit.");
     }
 
     console.log("✨ Script completed successfully");
