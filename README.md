@@ -4,7 +4,13 @@
 
 ## Installation
 
-You can install it globally:
+You can run `ups` commands directly using `npx` without needing a global installation:
+
+```bash
+npx @uwayss/ups <command_name> [options]
+```
+
+Alternatively, you can install it globally if you prefer:
 
 ```bash
 npm install -g @uwayss/ups
@@ -16,46 +22,62 @@ ups <command_name> [options]
 To use a script, invoke `ups` followed by the script's name (which is derived from its filename):
 
 ```bash
-ups <script_name> [script_specific_options]
+npx @uwayss/ups <script_name> [script_specific_options]
 ```
 
 For example:
 
 ```bash
-ups diff --msg
-ups dump
-ups dump src/components --natives
+npx @uwayss/ups diff
+npx @uwayss/ups dump
+npx @uwayss/ups dump src/components
 ```
 
 To see available commands:
 
 ```bash
-ups --help
+npx @uwayss/ups --help
 ```
 
 To see help for a specific command:
 
 ```bash
-ups <script_name> --help
+npx @uwayss/ups <script_name> --help
 ```
 
 ## Available Scripts
 
-`ups` dynamically discovers scripts placed in its `src/commands/` directory. The command name is the filename without the `.js` extension.
+`ups` dynamically discovers scripts placed in its `src/commands/` directory.
 
-Currently included scripts:
-
-- `diff`: Generates commit messages from git diffs and optionally saves diffs/messages.
-- `dump`: Dumps the codebase of a project into a single text file.
-
-## Adding New Scripts
-
-1.  Create your JavaScript file (e.g., `myCustomScript.js`) with its own logic. Your script can use `commander` or any other argument parsing library, or none if it doesn't take arguments. It should be an ES Module.
-2.  Place this file into the `src/commands/` directory within the `ups` package structure (if you're developing `ups` itself) or in the equivalent location if `ups` is installed globally/locally (typically within `node_modules/ups/src/commands/`).
-3.  The script will then be available as `ups myCustomScript`.
-
-Your script will be executed as a separate Node.js process, and any arguments you pass after `ups myCustomScript` will be forwarded to your script. Standard output, error, and exit codes from your script will be piped through `ups`.
+- `diff`: Generates conventional commit messages from git diffs and provides an option to commit and push the changes.
+- `dump`: Dumps the codebase of a project into a single text file, intelligently ignoring irrelevant files.
 
 ## Configuration
 
-Some scripts might require environment variables. For example, the `diff` script requires `GEMINI_API_KEY` to be set in your environment to communicate with the Google Gemini API.
+### diff
+
+The `diff` script requires `GEMINI_API_KEY` to be set in your environment to communicate with the Google Gemini API.
+
+### dump
+
+The `dump` script works out-of-the-box by automatically respecting your project's `.gitignore` file.
+
+For additional custom exclusions or to override the default output directory, you can create a `ups.config.json` file in the root of your project.
+
+Here is an example of what `ups.config.json` can look like:
+
+```json
+{
+  "dump": {
+    "dumpPath": "~/Code/Dumps",
+    "excludeDirs": ["docs", "examples"],
+    "excludeFiles": ["my-temp-script.js"],
+    "excludeExtensions": [".local"]
+  }
+}
+```
+
+- `dumpPath`: Overrides the default output directory (your Desktop) for all dumps. You can use `~` for your home directory.
+- `excludeDirs/Files/Extensions`: Add extra patterns to the exclusion lists.
+
+This provides a simple way to tailor the dump for any project without modifying the `ups` tool's source code.

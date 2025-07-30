@@ -3,167 +3,198 @@ import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
 import process from "process";
+import gitignore from "gitignore-parser";
+
+async function loadUserConfig(projectRoot) {
+  const configPath = path.join(projectRoot, "ups.config.json");
+  try {
+    const rawConfig = await fs.readFile(configPath, "utf-8");
+    return JSON.parse(rawConfig);
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return {}; // No config file is not an error
+    }
+    console.warn(
+      `⚠️ Warning: Could not load or parse ups.config.json: ${err.message}`
+    );
+    return {};
+  }
+}
+
+async function loadGitignore(projectRoot) {
+  const gitignorePath = path.join(projectRoot, ".gitignore");
+  try {
+    return await fs.readFile(gitignorePath, "utf-8");
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return ""; // No .gitignore is not an error
+    }
+    console.warn(`⚠️ Warning: Could not read .gitignore: ${err.message}`);
+    return "";
+  }
+}
 
 async function generateFileDump(
   projectRoot,
   outputFile,
   targetFolder,
-  includeNatives
+  userConfig,
+  gitignoreContent
 ) {
-  const defaultExcludeDirs = new Set([
-    ".git",
-    "__pycache__",
-    "node_modules",
-    ".expo",
-    ".yarn",
-    "coverage",
-    "build",
-    ".gradle",
-    ".idea",
-    ".cxx",
-    "xcuserdata",
-    "DerivedData",
-    "Pods",
-    "fastlane",
-    "bundle",
-    "ios",
-    "android",
-    "codebase",
-    "assets",
-    ".github",
-    "dist",
-    "bin",
-    "updates",
-    ".next",
+  const baseConfig = {
+    excludeDirs: [
+      ".git",
+      "__pycache__",
+      "node_modules",
+      ".expo",
+      ".yarn",
+      "coverage",
+      "build",
+      ".gradle",
+      ".idea",
+      ".cxx",
+      "xcuserdata",
+      "DerivedData",
+      "Pods",
+      "fastlane",
+      "bundle",
+      "ios",
+      "android",
+      "codebase",
+      "assets",
+      ".github",
+      "dist",
+      "bin",
+      "updates",
+    ],
+    excludeFiles: [
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "bun.lockb",
+      ".DS_Store",
+      "local.properties",
+      ".xcode.env.local",
+      "npm-debug.log",
+      "yarn-error.log",
+      ".metro-health-check",
+      "ups.config.json",
+    ],
+    excludeExtensions: [
+      ".apk",
+      ".aar",
+      ".jar",
+      ".keystore",
+      ".jks",
+      ".hprof",
+      ".iml",
+      ".pbxuser",
+      ".mode1v3",
+      ".mode2v3",
+      ".perspectivev3",
+      ".xccheckout",
+      ".moved-aside",
+      ".hmap",
+      ".ipa",
+      ".xcuserstate",
+      ".jsbundle",
+      ".wasm",
+      ".dat",
+      ".bin",
+      ".db",
+      ".sqlite",
+      ".obj",
+      ".pdb",
+      ".tlog",
+      ".lib",
+      ".exp",
+      ".dll",
+      ".so",
+      ".dylib",
+      ".class",
+      ".dex",
+      ".gradle-build",
+      ".log",
+      ".lock",
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".gif",
+      ".bmp",
+      ".tiff",
+      ".ico",
+      ".webp",
+      ".heic",
+      ".mp3",
+      ".wav",
+      ".ogg",
+      ".flac",
+      ".aac",
+      ".mp4",
+      ".mov",
+      ".avi",
+      ".wmv",
+      ".mkv",
+      ".webm",
+      ".ttf",
+      ".otf",
+      ".woff",
+      ".woff2",
+      ".zip",
+      ".tar",
+      ".gz",
+      ".rar",
+      ".7z",
+      ".bz2",
+      ".xz",
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".xls",
+      ".xlsx",
+      ".ppt",
+      ".pptx",
+      ".psd",
+      ".ai",
+      ".indd",
+      ".exe",
+      ".dmg",
+      ".app",
+      ".tsbuildinfo",
+    ],
+  };
+
+  const dumpConfig = userConfig.dump || {};
+  const excludeDirs = new Set([
+    ...baseConfig.excludeDirs,
+    ...(dumpConfig.excludeDirs || []),
+  ]);
+  const excludeFiles = new Set([
+    ...baseConfig.excludeFiles,
+    ...(dumpConfig.excludeFiles || []),
+  ]);
+  const excludeExtensions = new Set([
+    ...baseConfig.excludeExtensions,
+    ...(dumpConfig.excludeExtensions || []),
   ]);
 
-  const defaultExcludeFiles = new Set([
-    "package-lock.json",
-    "pnpm-lock.yaml",
-    "bun.lockb",
-    ".DS_Store",
-    "local.properties",
-    ".xcode.env.local",
-    "npm-debug.log",
-    "yarn-error.log",
-    ".metro-health-check",
-  ]);
-
-  const defaultExcludeExtensions = new Set([
-    ".apk",
-    ".aar",
-    ".jar",
-    ".keystore",
-    ".jks",
-    ".hprof",
-    ".iml",
-    ".pbxuser",
-    ".mode1v3",
-    ".mode2v3",
-    ".perspectivev3",
-    ".xccheckout",
-    ".moved-aside",
-    ".hmap",
-    ".ipa",
-    ".xcuserstate",
-    ".jsbundle",
-    ".wasm",
-    ".dat",
-    ".bin",
-    ".db",
-    ".sqlite",
-    ".obj",
-    ".pdb",
-    ".tlog",
-    ".lib",
-    ".exp",
-    ".dll",
-    ".so",
-    ".dylib",
-    ".class",
-    ".dex",
-    ".gradle-build",
-    ".log",
-    ".lock",
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".bmp",
-    ".tiff",
-    ".ico",
-    ".webp",
-    ".heic",
-    ".mp3",
-    ".wav",
-    ".ogg",
-    ".flac",
-    ".aac",
-    ".mp4",
-    ".mov",
-    ".avi",
-    ".wmv",
-    ".mkv",
-    ".webm",
-    ".ttf",
-    ".otf",
-    ".woff",
-    ".woff2",
-    ".zip",
-    ".tar",
-    ".gz",
-    ".rar",
-    ".7z",
-    ".bz2",
-    ".xz",
-    ".pdf",
-    ".doc",
-    ".docx",
-    ".xls",
-    ".xlsx",
-    ".ppt",
-    ".pptx",
-    ".psd",
-    ".ai",
-    ".indd",
-    ".exe",
-    ".dmg",
-    ".app",
-    ".tsbuildinfo",
-  ]);
-
-  const excludeDirs = new Set(defaultExcludeDirs);
-  if (includeNatives) {
-    excludeDirs.delete("ios");
-    excludeDirs.delete("android");
-  }
-
-  const excludeFiles = new Set(defaultExcludeFiles);
-  const excludeExtensions = new Set(defaultExcludeExtensions);
+  const gitignoreParser = gitignoreContent
+    ? gitignore.compile(gitignoreContent)
+    : null;
 
   let outputContent = `// AUTOGENERATED CODEBASE DUMP\n`;
   outputContent += `// Project Root: ${projectRoot}\n`;
   outputContent += `// Date: ${new Date().toISOString()}\n`;
-  if (targetFolder) {
-    outputContent += `// Target Folder: ${targetFolder}\n\n`;
-  } else {
-    outputContent += `// Target Folder: All (respecting exclusions)\n\n`;
-  }
+  outputContent += `// Target Folder: ${
+    targetFolder || "All (respecting exclusions)"
+  }\n\n`;
 
   async function walk(currentDir, processingRoot) {
     let entries;
     try {
       entries = await fs.readdir(currentDir, { withFileTypes: true });
     } catch (err) {
-      if (err.code === "ENOENT") {
-        console.warn(
-          `Warning: Directory not found during scan, skipping: ${currentDir}`
-        );
-        return;
-      } else if (err.code === "EACCES") {
-        console.warn(
-          `Warning: Permission denied for directory, skipping: ${currentDir}`
-        );
+      if (err.code === "ENOENT" || err.code === "EACCES") {
+        console.warn(`Warning: Cannot read directory, skipping: ${currentDir}`);
         return;
       }
       throw err;
@@ -171,12 +202,21 @@ async function generateFileDump(
 
     for (const entry of entries) {
       const entryPath = path.join(currentDir, entry.name);
-      const relativePath = path.relative(processingRoot, entryPath);
-      const parts = relativePath.split(path.sep);
+      const relativePath = path
+        .relative(processingRoot, entryPath)
+        .replace(/\\/g, "/");
+
+      if (
+        gitignoreParser &&
+        (gitignoreParser.denies(relativePath) ||
+          gitignoreParser.denies(path.basename(relativePath) + "/"))
+      ) {
+        continue;
+      }
 
       if (entry.isDirectory()) {
         if (
-          !parts.some((part) => excludeDirs.has(part)) &&
+          !excludeDirs.has(entry.name) &&
           entry.name !== path.basename(outputFile)
         ) {
           await walk(entryPath, processingRoot);
@@ -184,37 +224,19 @@ async function generateFileDump(
       } else if (entry.isFile()) {
         const fileExtension = path.extname(entry.name).toLowerCase();
         if (
-          !parts.some((part) => excludeDirs.has(part)) &&
+          !excludeDirs.has(path.dirname(relativePath)) &&
           !excludeFiles.has(entry.name) &&
           !excludeExtensions.has(fileExtension) &&
           entryPath !== path.resolve(outputFile)
         ) {
           try {
             const content = await fs.readFile(entryPath, "utf-8");
-            outputContent += `\n// FILE: ${relativePath.replace(/\\/g, "/")}\n`;
+            outputContent += `\n// FILE: ${relativePath}\n`;
             outputContent += content + "\n";
           } catch (error) {
-            if (
-              error.code === "ERR_INVALID_ARG_VALUE" ||
-              error.code === "ERR_BUFFER_TOO_LARGE" ||
-              (error.message &&
-                error.message.includes("is greater than a WritableStream"))
-            ) {
-              outputContent += `\n// FILE: ${relativePath.replace(
-                /\\/g,
-                "/"
-              )} (Skipped: Likely binary, unreadable, or too large)\n`;
-            } else if (error.code === "EACCES") {
-              outputContent += `\n// FILE: ${relativePath.replace(
-                /\\/g,
-                "/"
-              )} (Skipped: Permission denied)\n`;
-            } else {
-              outputContent += `\n// ERROR READING ${relativePath.replace(
-                /\\/g,
-                "/"
-              )}: ${error.message}\n`;
-            }
+            outputContent += `\n// FILE: ${relativePath} (Skipped: ${
+              error.code || "Unreadable"
+            })\n`;
           }
         }
       }
@@ -225,61 +247,39 @@ async function generateFileDump(
   let actualRootToWalk = resolvedProjectRoot;
 
   if (targetFolder) {
-    const targetPath = path.join(resolvedProjectRoot, targetFolder);
-    try {
-      const stats = await fs.stat(targetPath);
-      if (!stats.isDirectory() && !stats.isFile()) {
-        console.error(
-          `Error: Target '${targetFolder}' is not a valid file or directory.`
-        );
-        process.exit(1);
-      }
-      if (stats.isFile()) {
-        const relativePath = path.relative(resolvedProjectRoot, targetPath);
-        try {
-          const content = await fs.readFile(targetPath, "utf-8");
-          outputContent += `\n// FILE: ${relativePath.replace(/\\/g, "/")}\n`;
-          outputContent += content + "\n";
-        } catch (error) {
-          outputContent += `\n// FILE: ${relativePath.replace(
-            /\\/g,
-            "/"
-          )} (Skipped: Error reading file ${error.message})\n`;
-        }
-      } else {
-        actualRootToWalk = targetPath;
-        await walk(actualRootToWalk, actualRootToWalk);
-      }
-    } catch (err) {
+    actualRootToWalk = path.join(resolvedProjectRoot, targetFolder);
+    const stats = await fs.stat(actualRootToWalk).catch(() => null);
+    if (!stats) {
       console.error(
-        `Error: Target '${targetFolder}' not found or inaccessible: ${err.message}`
+        `Error: Target '${targetFolder}' not found or inaccessible.`
       );
       process.exit(1);
+    }
+    if (stats.isFile()) {
+      const relativePath = path
+        .relative(resolvedProjectRoot, actualRootToWalk)
+        .replace(/\\/g, "/");
+      try {
+        const content = await fs.readFile(actualRootToWalk, "utf-8");
+        outputContent += `\n// FILE: ${relativePath}\n`;
+        outputContent += content + "\n";
+      } catch (error) {
+        outputContent += `\n// FILE: ${relativePath} (Skipped: Error reading file ${error.message})\n`;
+      }
+    } else {
+      await walk(actualRootToWalk, actualRootToWalk);
     }
   } else {
     await walk(resolvedProjectRoot, resolvedProjectRoot);
   }
 
-  if (
-    targetFolder &&
-    (await fs.stat(path.join(resolvedProjectRoot, targetFolder))).isFile()
-  ) {
-    // Content already added if targetFolder was a file, so just write
-  } else if (actualRootToWalk === resolvedProjectRoot && targetFolder) {
-    // This case means target folder was specified but was not found or invalid and resulted in process.exit
-    // It should not reach here if an error occurred.
-    // If targetFolder was valid dir, walk was called with it.
-  } else if (!targetFolder) {
-    // Walked project root
-  }
-
   try {
     await fs.mkdir(path.dirname(outputFile), { recursive: true });
     await fs.writeFile(outputFile, outputContent, "utf-8");
-    console.log(`File dump created: ${path.resolve(outputFile)}`);
+    console.log(`✅ File dump created: ${path.resolve(outputFile)}`);
   } catch (error) {
     console.error(
-      `Error writing to output file '${outputFile}': ${error.message}`
+      `❌ Error writing to output file '${outputFile}': ${error.message}`
     );
     process.exit(1);
   }
@@ -288,56 +288,47 @@ async function generateFileDump(
 async function main() {
   console.log("🚀 Starting dump.js script...");
   program
-    .argument(
-      "[targetPath]",
-      "Optional target file or folder to dump (e.g., 'src/helpers', 'src/utils/myFile.js'). Dumps entire project if omitted."
-    )
-    .option(
-      "--natives",
-      "Include the native android/ and ios/ folders in the dump (if not targeting a specific file/subfolder that excludes them)."
-    )
-    .option(
-      "-o, --output <filename>",
-      "Specify the output filename (e.g., 'myDump.txt'). Saved to Desktop by default."
-    )
+    .argument("[targetPath]", "Optional target file or folder to dump.")
+    .option("-o, --output <filename>", "Specify the output filename.")
     .parse(process.argv);
 
-  const targetPathArg = program.args[0];
-  const options = program.opts();
-  const includeNatives = options.natives || false;
-
   const projectRoot = process.cwd();
-  const desktopDir = path.join(os.homedir(), "Desktop");
+  const options = program.opts();
+  const targetPathArg = program.args[0];
+
+  const [userConfig, gitignoreContent] = await Promise.all([
+    loadUserConfig(projectRoot),
+    loadGitignore(projectRoot),
+  ]);
+
+  const dumpConfig = userConfig.dump || {};
+  const customDumpPath = dumpConfig.dumpPath;
+  const baseDumpDir = customDumpPath
+    ? customDumpPath.replace("~", os.homedir())
+    : path.join(os.homedir(), "Desktop");
 
   let outputFilename;
   if (options.output) {
     outputFilename = options.output;
   } else {
     const parentFolderName = path.basename(projectRoot);
-    const timestamp = new Date()
-      .toLocaleTimeString("en-US", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
-      .replace(/:/g, "");
-    outputFilename = `${parentFolderName}_codebase_${
-      targetPathArg
-        ? path.basename(targetPathArg).replace(/\./g, "_") + "_"
-        : ""
-    }${timestamp}.txt`;
+    const timestamp = new Date().toISOString().slice(11, 19).replace(/:/g, "");
+    const targetBasename = targetPathArg
+      ? `_${path.basename(targetPathArg).replace(/\./g, "_")}`
+      : "";
+    outputFilename = `${parentFolderName}_codebase${targetBasename}_${timestamp}.txt`;
   }
 
   const outputFile = path.isAbsolute(outputFilename)
     ? outputFilename
-    : path.join(desktopDir, outputFilename);
+    : path.join(baseDumpDir, outputFilename);
 
   await generateFileDump(
     projectRoot,
     outputFile,
     targetPathArg,
-    includeNatives
+    userConfig,
+    gitignoreContent
   );
   console.log("✨ Script completed successfully");
 }
