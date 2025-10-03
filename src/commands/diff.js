@@ -118,20 +118,26 @@ async function generateCommitMessage(diffContent) {
     return "No changes to commit.";
   }
   console.log("📝 Generating commit message...");
-  const message = `Analyze the following git diff and generate a concise, well-structured commit message.
+  const message = `Analyze the following git diff and generate a commit message following the Conventional Commits specification.
 
-The commit message should follow these conventions:
-1.  A short, imperative-mood title (max 70 characters) on the first line. Example: "Refactor user authentication module"
-2.  A blank line after the title.
-3.  A bulleted list summarizing the key changes and their purpose. Each bullet point should be concise.
-    - Start each bullet point with a capital letter.
-    - Focus on *what* changed and *why*, not just *how*.
+The commit message format should be: type(optional-scope): description
+- Type must be one of: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
+- Scope is optional and in parentheses
+- Description should be in imperative mood and lowercase
+- Keep the header line under 72 characters
+- Optionally include a body with more detailed information after a blank line
+- Optionally include a footer with issue references like "Fixes #123"
 
-Do NOT include any markdown formatting like "\`\`\`" or code blocks in the commit message itself.
+Examples:
+- "feat: add user authentication"
+- "fix(auth): resolve login issue" 
+- "docs: update API documentation"
+
+Do NOT include any markdown formatting like "\`\`\`" or code blocks.
 Output only the raw commit message text.
 
 Git Diff:
-${diffContent}`;
+\${diffContent}`;
   return await callGemini(message);
 }
 
