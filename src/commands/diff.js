@@ -137,14 +137,14 @@ Do NOT include any markdown formatting like "\`\`\`" or code blocks.
 Output only the raw commit message text.
 
 Git Diff:
-\${diffContent}`;
+${diffContent}`;
   return await callGemini(message);
 }
 
 function saveCommitMessage(commitMessage, filepath) {
   console.log("💾 Saving commit message...");
   try {
-    fs.writeFileSync(filepath, filepath);
+    fs.writeFileSync(filepath, commitMessage);
     console.log(`✅ Commit message saved to: ${filepath}`);
   } catch (error) {
     console.error(`❌ Error saving commit message: ${error.message}`);
