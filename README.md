@@ -72,12 +72,14 @@ Here is an example of what `ups.config.json` can look like:
     "dumpPath": "~/Code/Dumps",
     "excludeDirs": ["docs", "examples"],
     "excludeFiles": ["my-temp-script.js"],
-    "excludeExtensions": [".local"]
+    "excludeExtensions": [".local"],
+    "ignoreMarker": "custom-ignore-marker"
   }
 }
 ```
 
 - `dumpPath`: Overrides the default output directory (your Desktop) for all dumps. You can use `~` for your home directory.
 - `excludeDirs/Files/Extensions`: Add extra patterns to the exclusion lists.
+- `ignoreMarker`: Specifies a string that, when found in a file, causes the `dump` command to ignore the rest of that file's content. The line containing the marker will still be included. If not set, it defaults to `"ups-ignore-rest"`.
 
 This provides a simple way to tailor the dump for any project without modifying the `ups` tool's source code.
